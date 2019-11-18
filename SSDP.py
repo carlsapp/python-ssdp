@@ -36,6 +36,7 @@ The hiearchy of message classes is:
 """
 import argparse
 import socket
+import sys
 import threading
 import time
 
@@ -515,7 +516,11 @@ def search(search_target=SearchTargetAll(), addr=SSDP_MULTICAST_ADDR, is_multica
         host = addr[0] + ':' + addr[1]
         search_request = SSDPUnicastSearchRequest(host=host, search_target=search_target)
     #print(search_request.get_header_str())
-    sock.sendto(search_request.get_header_str(), addr)
+    header_str = search_request.get_header_str()
+    # In Python 3, sendto changed to need a bytes object
+    if sys.version_info[0] > 2:
+        header_str = header_str.encode()
+    sock.sendto(header_str, addr)
 
     def accept_responses(response_wait_time_seconds=response_wait_time_seconds, callbacks=callbacks):
         search_responses = []
@@ -530,6 +535,9 @@ def search(search_target=SearchTargetAll(), addr=SSDP_MULTICAST_ADDR, is_multica
             except socket.timeout:
                 continue
             # print(data)
+            if sys.version_info[0] > 2:
+                # Python 3 changes data to be a bytes object
+                data = data.decode()
             search_response = create_ssdp_message_from_header(data)
             if search_response is None:
                 continue
@@ -595,7 +603,11 @@ def main(args=None):
         servers[ip_addr][uuid]['All Responses'].append(response)
     for server_addr in servers:
         print("Server at {}".format(server_addr))
-        first_uuid = servers[server_addr].keys()[0]
+        if sys.version_info[0] == 2:
+            first_uuid = servers[server_addr].keys()[0]
+        else:
+            # In Python 3, dict.keys() changed to return a dict_keys object (similar to a set)
+            first_uuid = list(servers[server_addr].keys())[0]
         print("  {}".format(servers[server_addr][first_uuid]['All Responses'][0].server))
         for uuid in servers[server_addr]:
             dev_info = servers[server_addr][uuid]
